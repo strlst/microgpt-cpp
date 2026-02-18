@@ -36,6 +36,9 @@ class Value:
         self._children = children       # children of this node in the computation graph
         self._local_grads = local_grads # local derivative of this node w.r.t. its children
 
+    def __str__(self):
+        return f'{self.data}{{d={self.grad}}}'
+
     def __add__(self, other):
         other = other if isinstance(other, Value) else Value(other)
         return Value(self.data + other.data, (self, other), (1, 1))
@@ -149,7 +152,8 @@ m = [0.0] * len(params) # first moment buffer
 v = [0.0] * len(params) # second moment buffer
 
 # Repeat in sequence
-num_steps = 1000 # number of training steps
+#num_steps = 1000 # number of training steps
+num_steps = 1
 for step in range(num_steps):
 
     # Take single document, tokenize it, surround it with BOS special token on both sides
@@ -186,7 +190,9 @@ for step in range(num_steps):
 # Inference: may the model babble back to us
 temperature = 0.5 # in (0, 1], control the "creativity" of generated text, low to high
 print("\n--- inference (new, hallucinated names) ---")
-for sample_idx in range(20):
+#samples = 20
+samples = 1
+for sample_idx in range(samples):
     keys, values = [[] for _ in range(n_layer)], [[] for _ in range(n_layer)]
     token_id = BOS
     sample = []

@@ -1,6 +1,7 @@
 #include <iostream>
 #include "util.h"
 #include "model.hpp"
+#include "adam.hpp"
 
 int main() {
     // open local file (or remote location if not downloaded)
@@ -19,12 +20,14 @@ int main() {
             unique_chars.insert(letter);
         }
     }
-    char BOS = unique_chars.size();
+    int BOS = unique_chars.size();
     int vocab_size = unique_chars.size() + 1;
     std::cout << "Initialized vocabulary of size " << vocab_size << std::endl;
 
     // initialize model, especially the params, so there be stored values
-    Model model;
+    Model model(vocab_size);
+    Adam adam(1);
+    adam.train(model, docs, BOS);
 
     return 0;
 }

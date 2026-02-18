@@ -1,0 +1,67 @@
+#ifndef __VALUE_HPP__
+#define __VALUE_HPP__
+
+#include <memory>
+#include <vector>
+
+class Value : public std::enable_shared_from_this<Value> {
+    typedef std::shared_ptr<Value> value_t;
+    typedef std::vector<value_t> vector_t;
+    typedef std::vector<vector_t> matrix_t;
+private:
+    // children of this node in the computation graph
+    vector_t children;
+    // local partial derivatives with respect to this node's childrens
+    std::vector<float> local_grads;
+public:
+    // store the actual value
+    float data;
+    // store the actual computed gradient
+    float grad;
+
+    Value(float data, vector_t children = {}, std::vector<float> local_grads = {});
+
+    // binary ops
+    value_t operator+(const value_t& other);
+    value_t operator*(const value_t& other);
+    value_t operator-(const value_t& other);
+    value_t operator/(const value_t& other);
+    value_t pow(const value_t& other);
+
+    // unary ops
+    value_t operator-();
+    value_t exp();
+    value_t log();
+    value_t relu();
+
+    void backward();
+
+    // auxiliary overloads
+    std::string to_string() const;
+};
+
+// export useful typedefs
+typedef std::shared_ptr<Value> value_t;
+typedef std::vector<value_t> vector_t;
+typedef std::vector<vector_t> matrix_t;
+
+// binary ops
+value_t operator+(const value_t& lhs, const value_t& rhs);
+value_t operator*(const value_t& lhs, const value_t& rhs);
+value_t operator-(const value_t& lhs, const value_t& rhs);
+value_t operator/(const value_t& lhs, const value_t& rhs);
+value_t pow(const value_t& lhs, const value_t& rhs);
+
+
+// helpers
+value_t value_from(float x);
+void print_vector_t(const vector_t vector);
+void print_matrix_t(const matrix_t matrix);
+
+// reduction ops
+// NOTE: better defined as vector class ops?
+value_t max(vector_t vec);
+value_t sum(vector_t vec);
+value_t dot(vector_t a, vector_t b);
+
+#endif

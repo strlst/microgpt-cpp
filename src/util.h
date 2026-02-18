@@ -2,7 +2,7 @@
 #include <fstream>
 #include <stdexcept>
 #include <string>
-#include "httplib.h"
+#include "../lib/httplib.h"
 
 int find_nth_occurence(const std::string& str, char ch, int n);
 void save_url_as_file(const std::string& url, const std::string& file_name);
