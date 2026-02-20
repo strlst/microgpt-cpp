@@ -17,6 +17,9 @@ find_package(OpenSSL REQUIRED)
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pg")
 
+# perf debug symbols
+#set(CMAKE_BUILD_TYPE Debug)
+
 add_executable(microgpt src/microgpt.cpp src/util.cpp src/value.cpp src/model.cpp src/adam.cpp)
 target_link_libraries(microgpt OpenSSL::SSL OpenSSL::Crypto)
 #if(OpenMP_CXX_FOUND)
