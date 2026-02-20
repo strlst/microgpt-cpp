@@ -29,16 +29,9 @@ void Model::infer(int BOS, size_t num_samples, float temperature) {
     std::cout << "Inferring " << num_samples << " samples with temperature " << temperature << std::endl;
 
     for (int step = 0; step < num_samples; step++) {
-        // prepare new KV matrices
-        std::vector<matrix_t> keys;
-        std::vector<matrix_t> values;
-        keys.reserve(n_layer);
-        values.reserve(n_layer);
-        for (int i = 0; i < n_layer; i++) {
-            matrix_t empty, empty2;
-            keys.push_back(empty);
-            values.push_back(empty2);
-        }
+        // prepare new KV tensors
+        std::vector<matrix_t> keys, values;
+        prepare_tensors(keys, values, n_layer);
 
         int token_id = BOS;
         std::vector<int> sample;
@@ -114,7 +107,6 @@ vector_t Model::get_all_parameters() {
     return parameters;
 }
 
-// TODO: omp parallelization?
 vector_t Model::linear(const vector_t& x, const matrix_t& w) {
     vector_t ret;
     ret.reserve(w.size());
@@ -181,6 +173,7 @@ vector_t Model::gpt(int token_id, int pos_id, std::vector<matrix_t>& keys, std::
     for (int li = 0; li < n_layer; li++) {
         //std::cout << "At layer " << li << std::endl;
         std::string prefix = "layer" + std::to_string(li) + "_";
+        // copy x as a residual for later
         vector_t x_residual = copy(x);
         x = rms_norm(x);
         vector_t q = linear(x, weights[prefix + "attn_wq"]);
@@ -233,6 +226,7 @@ vector_t Model::gpt(int token_id, int pos_id, std::vector<matrix_t>& keys, std::
         for (int i = 0; i < x.size(); i++)
             x_res_sum.push_back(x[i] + x_residual[i]);
 
+        // recopy vec as a residual for later
         x_residual = copy(x);
 
         x = rms_norm(x);

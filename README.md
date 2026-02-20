@@ -9,7 +9,7 @@ For file downloads, the excellent and simple single-file header-only library [pr
 ## Sample Output
 
 ```
-Successfully opened file "names.txt"
+Successfully saved "https://raw.githubusercontent.com/karpathy/makemore/refs/heads/master/names.txt" to "names.txt"
 Initialized vocabulary of size 27
 Initialized weights [layer0_attn_wk layer0_attn_wo layer0_attn_wq layer0_attn_wv layer0_mlp_fc1 layer0_mlp_fc2 lm_head wpe wte ] with normdist(mean=0, std_dev=0.08)
 Created model(n_embed=16, n_head=4, n_layer=1, head_dim=4)

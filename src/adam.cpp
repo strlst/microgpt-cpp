@@ -25,16 +25,9 @@ void Adam::train(Model& model, std::vector<std::string> docs, int BOS) {
             tokens.push_back(ch - 'a');
         tokens.push_back(BOS);
 
-        // create tensors
-        std::vector<matrix_t> keys;
-        std::vector<matrix_t> values;
-        keys.reserve(model.n_layer);
-        values.reserve(model.n_layer);
-        for (int i = 0; i < model.n_layer; i++) {
-            matrix_t empty, empty2;
-            keys.push_back(empty);
-            values.push_back(empty2);
-        }
+        // prepare KV tensors
+        std::vector<matrix_t> keys, values;
+        prepare_tensors(keys, values, model.n_layer);
 
         vector_t losses;
         int n = std::min((size_t)model.block_size, tokens.size() - 1);

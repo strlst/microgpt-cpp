@@ -187,6 +187,16 @@ vector_t copy(vector_t& vec) {
     return new_vec;
 }
 
+void prepare_tensors(std::vector<matrix_t>& keys, std::vector<matrix_t>& values, int n_layer) {
+    keys.reserve(n_layer);
+    values.reserve(n_layer);
+    for (int i = 0; i < n_layer; i++) {
+        matrix_t empty, empty2;
+        keys.push_back(empty);
+        values.push_back(empty2);
+    }
+}
+
 value_t max(vector_t vec) {
     // compute max float
     float max_float = 0.f;

@@ -66,6 +66,7 @@ void print_vector_ptrs(const vector_t& vector);
 void print_vector(const vector_t& vector);
 void print_matrix(const matrix_t& matrix);
 vector_t copy(vector_t& vec);
+void prepare_tensors(std::vector<matrix_t>& keys, std::vector<matrix_t>& values, int n_layer);
 
 // reduction ops
 // NOTE: better defined as vector class ops?

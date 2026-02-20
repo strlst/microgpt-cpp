@@ -15,7 +15,7 @@ int main() {
 
     // let there be a tokenizer to translate string to discrete symbols and back
     std::set<char> unique_chars;
-    for (std::string doc : docs) {
+    for (const std::string& doc : docs) {
         for (char letter : doc) {
             unique_chars.insert(letter);
         }
