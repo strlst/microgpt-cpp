@@ -196,7 +196,7 @@ void prepare_tensors(std::vector<matrix_t>& keys, std::vector<matrix_t>& values,
     }
 }
 
-value_t max(vector_t vec) {
+value_t max(const vector_t& vec) {
     // compute max float
     float max_float = 0.f;
     for (auto& v : vec)
@@ -205,7 +205,7 @@ value_t max(vector_t vec) {
     return value_from(max_float);
 }
 
-value_t sum(vector_t vec) {
+value_t sum(const vector_t& vec) {
     // perform sum
     value_t sum = value_from(0.f);
     for (auto& v : vec)
@@ -213,7 +213,7 @@ value_t sum(vector_t vec) {
     return sum;
 }
 
-value_t dot(vector_t a, vector_t b) {
+value_t dot(const vector_t& a, const vector_t& b) {
     // sanity check
     assert(a.size() == b.size());
 

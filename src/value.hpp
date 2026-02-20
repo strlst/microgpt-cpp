@@ -72,8 +72,8 @@ void prepare_tensors(std::vector<matrix_t>& keys, std::vector<matrix_t>& values,
 
 // reduction ops
 // NOTE: better defined as vector class ops?
-value_t max(vector_t vec);
-value_t sum(vector_t vec);
-value_t dot(vector_t a, vector_t b);
+value_t max(const vector_t& vec);
+value_t sum(const vector_t& vec);
+value_t dot(const vector_t& a, const vector_t& b);
 
 #endif
