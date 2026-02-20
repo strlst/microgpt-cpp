@@ -89,14 +89,13 @@ value_t Value::relu() {
     return out;
 }
 
-void Value::build_topology(vector_t& topology, set_t& visited) {
-    value_t node = shared_from_this();
+void Value::build_topology(value_t node, vector_t& topology, set_t& visited) {
     // skip visited nodes
     if (visited.find(node) != visited.end())
         return;
-    visited.emplace(node);
+    visited.insert(node);
     for (value_t child : node->children) {
-        child->build_topology(topology, visited);
+        child->build_topology(child, topology, visited);
     }
     topology.push_back(node);
 }
@@ -106,10 +105,10 @@ void Value::backward() {
     set_t visited;
 
     // build topology first
-    this->build_topology(topology, visited);
+    build_topology(shared_from_this(), topology, visited);
 
     // reset root grad
-    this->grad = 1.f;
+    grad = 1.f;
 
     // iterate topology backwards for root-first grad
     for (auto it = topology.rbegin(); it != topology.rend(); it++) {
@@ -217,11 +216,10 @@ value_t sum(vector_t vec) {
 value_t dot(vector_t a, vector_t b) {
     // sanity check
     assert(a.size() == b.size());
-    int n = b.size();
 
     // perform dot product
     value_t sum = value_from(0.f);
-    for (int k = 0; k < n; k++) {
+    for (int k = 0; k < a.size(); k++) {
         sum = sum + (a[k] * b[k]);
     }
 

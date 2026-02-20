@@ -119,7 +119,7 @@ vector_t Model::linear(const vector_t& x, const matrix_t& w) {
     return ret;
 }
 
-vector_t Model::softmax(vector_t logits) {
+vector_t Model::softmax(vector_t& logits) {
     value_t max_value = max(logits);
 
     // construct exps vector and sum at the same time
@@ -141,7 +141,7 @@ vector_t Model::softmax(vector_t logits) {
     return div;
 }
 
-vector_t Model::rms_norm(vector_t x) {
+vector_t Model::rms_norm(vector_t& x) {
     value_t length = value_from(x.size());
     value_t mean_square = dot(x, x) / length;
     value_t factor = value_from(1e-5);
@@ -173,8 +173,7 @@ vector_t Model::gpt(int token_id, int pos_id, std::vector<matrix_t>& keys, std::
     for (int li = 0; li < n_layer; li++) {
         //std::cout << "At layer " << li << std::endl;
         std::string prefix = "layer" + std::to_string(li) + "_";
-        // copy x as a residual for later
-        vector_t x_residual = copy(x);
+        vector_t x_residual = x;
         x = rms_norm(x);
         vector_t q = linear(x, weights[prefix + "attn_wq"]);
         vector_t k = linear(x, weights[prefix + "attn_wk"]);
@@ -225,9 +224,7 @@ vector_t Model::gpt(int token_id, int pos_id, std::vector<matrix_t>& keys, std::
         vector_t x_res_sum;
         for (int i = 0; i < x.size(); i++)
             x_res_sum.push_back(x[i] + x_residual[i]);
-
-        // recopy vec as a residual for later
-        x_residual = copy(x);
+        x_residual = x;
 
         x = rms_norm(x);
 

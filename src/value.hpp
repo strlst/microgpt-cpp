@@ -15,6 +15,9 @@ private:
     vector_t children;
     // local partial derivatives with respect to this node's childrens
     std::vector<float> local_grads;
+
+    // backward pass helper
+    void build_topology(value_t node, vector_t& topology, set_t& visited);
 public:
     // store the actual value
     float data;
@@ -40,7 +43,6 @@ public:
     value_t log();
     value_t relu();
 
-    void build_topology(vector_t& topology, set_t& visited);
     void backward();
 
     // auxiliary overloads
