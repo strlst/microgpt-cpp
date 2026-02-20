@@ -14,43 +14,59 @@ Initialized vocabulary of size 27
 Initialized weights [layer0_attn_wk layer0_attn_wo layer0_attn_wq layer0_attn_wv layer0_mlp_fc1 layer0_mlp_fc2 lm_head wpe wte ] with normdist(mean=0, std_dev=0.08)
 Created model(n_embed=16, n_head=4, n_layer=1, head_dim=4)
 Training with num_steps=1000
-step    0 / 1000 | Loss 3.27773
-step    1 / 1000 | Loss 3.29826
-step    2 / 1000 | Loss 3.22314
-step    3 / 1000 | Loss 3.30184
+step    0 / 1000 | Loss 3.39056
+step    1 / 1000 | Loss 3.19808
+step    2 / 1000 | Loss 3.30276
+step    3 / 1000 | Loss 3.34283
 ...
-step  997 / 1000 | Loss 1.61079
-step  998 / 1000 | Loss 2.00558
-step  999 / 1000 | Loss 1.749
+step  997 / 1000 | Loss 1.46412
+step  998 / 1000 | Loss 2.19503
+step  999 / 1000 | Loss 1.45953
 Inferring 30 samples with temperature 0.5
-sample: alaya
-sample: barnen
-sample: kiia
-sample: kasa
-sample: arian
-sample: karana
-sample: jayla
-sample: berenr
-sample: joria
-sample: aloely
-sample: malie
-sample: alan
-sample: alien
-sample: apie
-sample: amalena
-sample: ailan
-sample: cana
-sample: jana
-sample: kalie
+sample: aleya
+sample: briona
+sample: kela
+sample: kaylen
+sample: lailia
+sample: alalee
+sample: elelise
+sample: jarllenn
+sample: hoga
+sample: anily
+sample: elah
+sample: taria
+sample: maria
+sample: amelera
+sample: aliia
+sample: cara
+sample: jara
+sample: kalia
 sample: alila
-sample: malila
-sample: adera
-sample: reria
-sample: arela
-sample: alaey
-sample: mera
-sample: ajielee
-sample: kalile
-sample: zeyly
-sample: yelenn
+sample: mallia
+sample: adena
+sample: rerla
+sample: anale
+sample: aleer
+sample: mara
+sample: alielee
+sample: karile
+sample: ya
+sample: colya
+sample: galina
 ```
+
+## Performance comparison
+
+Below is a simple performance comparison (AMD Ryzen 7 5700X).
+
+command                | 200 training steps | 1k training steps
+:----------------------|-------------------:|-----------------:
+`python3 micrograd.py` |           0m3.421s |         1m13.109s
+`make; micrograd`      |          0m15.446s |         0m17.132s
+
+## Flamegraph Execution Time Breakdown
+
+Flamegraphs generated as in `flamegraph.sh` can be used effectively to investigate detailed performance breakdowns.
+Below is an example.
+
+![Flamegraph performance breakdown](flamegraph.png)

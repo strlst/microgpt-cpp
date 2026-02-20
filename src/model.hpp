@@ -40,6 +40,7 @@ public:
     vector_t linear(const vector_t& x, const matrix_t& w);
     vector_t softmax(vector_t& logits);
     vector_t rms_norm(vector_t& x);
+    vector_t gpt_old(int token_id, int pos_id, std::vector<matrix_t>& keys, std::vector<matrix_t>& values);
     vector_t gpt(int token_id, int pos_id, std::vector<matrix_t>& keys, std::vector<matrix_t>& values);
 };
 

@@ -18,7 +18,7 @@ Model::Model(size_t vocab_size) {
     }
 
     std::cout << "Initialized weights [";
-    for (auto [key, val] : weights)
+    for (auto& [key, val] : weights)
         std::cout << key << " ";
 
     std::cout << "] with normdist(mean=" << dist_mean << ", std_dev=" << dist_std_dev << ")" << std::endl;
@@ -29,7 +29,6 @@ void Model::infer(int BOS, size_t num_samples, float temperature) {
     std::cout << "Inferring " << num_samples << " samples with temperature " << temperature << std::endl;
 
     for (int step = 0; step < num_samples; step++) {
-        // prepare new KV tensors
         std::vector<matrix_t> keys, values;
         prepare_tensors(keys, values, n_layer);
 
@@ -42,34 +41,30 @@ void Model::infer(int BOS, size_t num_samples, float temperature) {
 
             // make our logits hotter (or colder, or even just warm)
             vector_t hot_logits;
+            hot_logits.reserve(logits.size());
             for (auto& logit : logits)
                 hot_logits.push_back(logit / temp_value);
 
-            // construct probabilities
             vector_t probabilities = softmax(hot_logits);
 
-            // extract data field from all probabilities
             std::vector<float> weights;
+            weights.reserve(probabilities.size());
             float dist_sum = 0.f;
             for (auto& p : probabilities) {
                 weights.push_back(p->data);
                 dist_sum += p->data;
             }
-            // check if distribution sums to 1
             assert(dist_sum - 1.f < 1e-3);
 
-            //std::cout << probabilities.size() << " weights sum to " << dist_sum << ": ";
-            //print_vector_t(probabilities);
             std::discrete_distribution<> discrete_dist(weights.begin(), weights.end());
             token_id = discrete_dist(generator);
-            if (token_id == BOS) {
+            if (token_id == BOS)
                 break;
-            }
             sample.push_back(token_id);
         }
 
         std::cout << "sample: ";
-        for (auto& s : sample)
+        for (auto s : sample)
             std::cout << (char)('a' + (char)s);
         std::cout << std::endl;
     }
@@ -94,28 +89,19 @@ matrix_t Model::initialize_matrix(int n_out, int n_in) {
 
 vector_t Model::get_all_parameters() {
     vector_t parameters;
-
     // iterate all matrices and collect parameters
-    for (auto& [key, matrix] : weights) {
-        for (auto& row : matrix) {
-            for (auto& val : row) {
+    for (auto& [key, matrix] : weights)
+        for (auto& row : matrix)
+            for (auto& val : row)
                 parameters.push_back(val);
-            }
-        }
-    }
-
     return parameters;
 }
 
 vector_t Model::linear(const vector_t& x, const matrix_t& w) {
     vector_t ret;
     ret.reserve(w.size());
-
-    // iterate weight rows
-    for (const vector_t& row : w) {
+    for (const vector_t& row : w)
         ret.push_back(dot(row, x));
-    }
-
     return ret;
 }
 
@@ -132,7 +118,7 @@ vector_t Model::softmax(vector_t& logits) {
         total = total + exponential;
     }
 
-    // finally execute normalization step
+    // normalization step
     vector_t div;
     div.reserve(logits.size());
     for (auto& exponential : exponentials)
@@ -142,13 +128,14 @@ vector_t Model::softmax(vector_t& logits) {
 }
 
 vector_t Model::rms_norm(vector_t& x) {
-    value_t length = value_from(x.size());
+    value_t length = value_from((float)x.size());
     value_t mean_square = dot(x, x) / length;
-    value_t factor = value_from(1e-5);
+    value_t factor = value_from(1e-5f);
     value_t power = value_from(-.5f);
     value_t scale = (mean_square + factor)->pow(power);
     vector_t ret;
-    for (int i = 0; i < x.size(); i++)
+    ret.reserve(x.size());
+    for (size_t i = 0; i < x.size(); i++)
         ret.push_back(x[i] * scale);
     return ret;
 }
@@ -160,12 +147,11 @@ vector_t Model::gpt(int token_id, int pos_id, std::vector<matrix_t>& keys, std::
     vector_t& pos_emb = weights["wpe"][pos_id];
     assert(token_emb.size() == pos_emb.size());
 
-    // compute emb
+    // compute embedding
     vector_t x;
     x.reserve(token_emb.size());
-    for (int i = 0; i < token_emb.size(); i++) {
+    for (size_t i = 0; i < token_emb.size(); i++)
         x.push_back(token_emb[i] + pos_emb[i]);
-    }
 
     // compute root-mean-square norm
     x = rms_norm(x);
@@ -181,65 +167,55 @@ vector_t Model::gpt(int token_id, int pos_id, std::vector<matrix_t>& keys, std::
         keys[li].push_back(k);
         values[li].push_back(v);
 
+        const int seq_len = keys[li].size();
+        const float inv_sqrt_d = 1.f / std::sqrt((float)head_dim);
+
         vector_t x_attn;
+        x_attn.reserve(n_embed);
+
         for (int h = 0; h < n_head; h++) {
-            //std::cout << "At head " << h << std::endl;
-            int hs = h * head_dim;
-            // prepare query
-            vector_t q_h(q.begin() + hs, q.begin() + hs + head_dim);
+            const int hs = h * head_dim;
 
-            // prepare keys
-            matrix_t k_h;
-            k_h.reserve(keys[li].size());
-            for (auto& ki : keys[li])
-                k_h.emplace_back(ki.begin() + hs, ki.begin() + hs + head_dim);
-
-            // prepare values
-            matrix_t v_h;
-            v_h.reserve(values[li].size());
-            for (auto& vi : values[li])
-                v_h.emplace_back(vi.begin() + hs, vi.begin() + hs + head_dim);
-
+            // compute attention logits without copying slices:
+            // score[t] = sum_j q[hs+j] * k_t[hs+j] (using dot_slice)
             vector_t attn_logits;
-            attn_logits.reserve(k_h.size());
-            value_t sqrt_d_head = (value_from(head_dim)->pow(value_from(0.5f)));
-            for (size_t t = 0; t < k_h.size(); t++) {
-                value_t score = value_from(0.f);
-                for (int j = 0; j < head_dim; j++)
-                    score = score + (q_h[j] * k_h[t][j]);
-                attn_logits.push_back(score / sqrt_d_head);
+            attn_logits.reserve(seq_len);
+            value_t inv_sqrt_val = value_from(inv_sqrt_d);
+            for (int t = 0; t < seq_len; t++) {
+                value_t score = dot_slice(q, hs, keys[li][t], hs, head_dim);
+                attn_logits.push_back(score * inv_sqrt_val);
             }
+
             vector_t attn_weights = softmax(attn_logits);
 
-            for (size_t j = 0; j < head_dim; j++) {
+            // weighted sum over value vectors (again using slice offsets)
+            for (int j = 0; j < head_dim; j++) {
                 value_t head_out = value_from(0.f);
-                for (int t = 0; t < v_h.size(); t++)
-                    head_out = head_out + (attn_weights[t] * v_h[t][j]);
+                for (int t = 0; t < seq_len; t++)
+                    head_out = head_out + (attn_weights[t] * values[li][t][hs + j]);
                 x_attn.push_back(head_out);
             }
         }
 
         x = linear(x_attn, weights[prefix + "attn_wo"]);
 
-        vector_t x_res_sum;
+        // residual add
         for (int i = 0; i < x.size(); i++)
-            x_res_sum.push_back(x[i] + x_residual[i]);
+            x[i] = x[i] + x_residual[i];
         x_residual = x;
 
         x = rms_norm(x);
-
         x = linear(x, weights[prefix + "mlp_fc1"]);
 
-        vector_t x_relu;
-        for (int i = 0; i < x.size(); i++)
-            x_relu.push_back(x[i]->relu());
+        // ReLU in-place (avoids a second vector allocation)
+        for (auto& val : x)
+            val = val->relu();
 
-        x = linear(x_relu, weights[prefix + "mlp_fc2"]);
+        x = linear(x, weights[prefix + "mlp_fc2"]);
 
-        vector_t x_res_sum2;
-        for (int i = 0; i < x.size(); i++)
-            x_res_sum2.push_back(x[i] + x_residual[i]);
-        x = x_res_sum2;
+        // residual add
+        for (int i = 0; i < (int)x.size(); i++)
+            x[i] = x[i] + x_residual[i];
     }
 
     vector_t logits = linear(x, weights["lm_head"]);

@@ -12,15 +12,15 @@
 Value::Value(float data, vector_t children, std::vector<float> local_grads) {
     this->data = data;
     this->grad = 0.f;
-    this->children = children;
-    this->local_grads = local_grads;
+    this->children = std::move(children);
+    this->local_grads = std::move(local_grads);
 }
 
 Value::Value(float data, float grad, vector_t children, std::vector<float> local_grads) {
     this->data = data;
     this->grad = grad;
-    this->children = children;
-    this->local_grads = local_grads;
+    this->children = std::move(children);
+    this->local_grads = std::move(local_grads);
 }
 
 value_t Value::copy() {
@@ -31,24 +31,22 @@ value_t Value::copy() {
 value_t Value::operator+(const value_t& other) {
     auto out_children = vector_t{shared_from_this(), other};
     auto out_grads = std::vector<float>{1.f, 1.f};
-    auto out = std::make_shared<Value>(data + other->data, out_children, out_grads);
-    return out;
+    return std::make_shared<Value>(data + other->data, std::move(out_children), std::move(out_grads));
 }
 
 value_t Value::operator*(const value_t& other) {
     auto out_children = vector_t{shared_from_this(), other};
     auto out_grads = std::vector<float>{other->data, this->data};
-    auto out = std::make_shared<Value>(data * other->data, out_children, out_grads);
-    return out;
+    return std::make_shared<Value>(data * other->data, std::move(out_children), std::move(out_grads));
 }
 
 value_t Value::operator-(const value_t& other) {
-    // make use of overloaded global operator (lhs - rhs)
+    // make use of overloaded global operator (lhs + rhs)
     return shared_from_this() + (other->operator-());
 }
 
 value_t Value::operator/(const value_t& other) {
-    // make use of overloaded global operator (lhs - rhs)
+    // make use of overloaded global operator (lhs * rhs)
     return shared_from_this() * (other->pow(std::make_shared<Value>(-1.f)));
 }
 
@@ -56,8 +54,7 @@ value_t Value::pow(const value_t& other) {
     auto out_children = vector_t{shared_from_this()};
     // high school math: dx**n/dx = n * x**(n - 1)
     auto out_grads = std::vector<float>{other->data * std::pow(this->data, other->data - 1.f)};
-    auto out = std::make_shared<Value>(std::pow(data, other->data), out_children, out_grads);
-    return out;
+    return std::make_shared<Value>(std::pow(data, other->data), std::move(out_children), std::move(out_grads));
 }
 
 // unary ops
@@ -69,40 +66,36 @@ value_t Value::exp() {
     auto out_children = vector_t{shared_from_this()};
     // high school math: dexp(x)/dx = exp(x)
     auto out_grads = std::vector<float>{std::exp(this->data)};
-    auto out = std::make_shared<Value>(std::exp(data), out_children, out_grads);
-    return out;
+    return std::make_shared<Value>(std::exp(data), std::move(out_children), std::move(out_grads));
 }
 
 value_t Value::log() {
     auto out_children = vector_t{shared_from_this()};
     // high school math: dlog(x)/dx = 1 / x
-    auto out_grads = std::vector<float>{1 / this->data};
-    auto out = std::make_shared<Value>(std::log(data), out_children, out_grads);
-    return out;
+    auto out_grads = std::vector<float>{1.f / this->data};
+    return std::make_shared<Value>(std::log(data), std::move(out_children), std::move(out_grads));
 }
 
 value_t Value::relu() {
     auto out_children = vector_t{shared_from_this()};
-    // high school math: dlog(x)/dx = 1 / x
     auto out_grads = std::vector<float>{(float)(this->data > 0)};
-    auto out = std::make_shared<Value>(std::max(this->data, 0.f), out_children, out_grads);
-    return out;
+    return std::make_shared<Value>(std::max(this->data, 0.f), std::move(out_children), std::move(out_grads));
 }
 
-void Value::build_topology(value_t node, vector_t& topology, set_t& visited) {
-    // skip visited nodes
-    if (visited.find(node) != visited.end())
+// use raw pointer to avoid shared_ptr ref-counts
+void Value::build_topology(value_t node, vector_t& topology, std::unordered_set<Value*>& visited) {
+    Value* raw = node.get();
+    if (!visited.insert(raw).second)
         return;
-    visited.insert(node);
-    for (value_t child : node->children) {
+    for (const value_t& child : node->children) {
         child->build_topology(child, topology, visited);
     }
-    topology.push_back(node);
+    topology.push_back(std::move(node));
 }
 
 void Value::backward() {
     vector_t topology;
-    set_t visited;
+    std::unordered_set<Value*> visited;
 
     // build topology first
     build_topology(shared_from_this(), topology, visited);
@@ -112,13 +105,13 @@ void Value::backward() {
 
     // iterate topology backwards for root-first grad
     for (auto it = topology.rbegin(); it != topology.rend(); it++) {
-        auto& children = it->get()->children;
-        auto& local_grads = it->get()->local_grads;
-        // sanity check
+        Value* node = it->get();
+        const float node_grad = node->grad;
+        const auto& children = node->children;
+        const auto& local_grads = node->local_grads;
         assert(children.size() == local_grads.size());
-        // accumulate gradients
-        for (int i = 0; i < children.size(); i++)
-            children[i]->grad += it->get()->grad * local_grads[i];
+        for (size_t i = 0; i < children.size(); i++)
+            children[i]->grad += node_grad * local_grads[i];
     }
 }
 
@@ -181,6 +174,7 @@ void print_matrix(const matrix_t& matrix) {
 
 vector_t copy(vector_t& vec) {
     vector_t new_vec;
+    new_vec.reserve(vec.size());
     for (auto& v : vec)
         new_vec.push_back(v->copy());
     return new_vec;
@@ -190,38 +184,74 @@ void prepare_tensors(std::vector<matrix_t>& keys, std::vector<matrix_t>& values,
     keys.reserve(n_layer);
     values.reserve(n_layer);
     for (int i = 0; i < n_layer; i++) {
-        matrix_t empty, empty2;
-        keys.push_back(empty);
-        values.push_back(empty2);
+        keys.emplace_back();
+        values.emplace_back();
     }
 }
 
 value_t max(const vector_t& vec) {
-    // compute max float
-    float max_float = 0.f;
-    for (auto& v : vec)
-        max_float = std::max(max_float, v->data);
-    // create shared value
+    float max_float = vec[0]->data;
+    for (size_t i = 1; i < vec.size(); i++)
+        max_float = std::max(max_float, vec[i]->data);
     return value_from(max_float);
 }
 
 value_t sum(const vector_t& vec) {
-    // perform sum
-    value_t sum = value_from(0.f);
+    value_t total = value_from(0.f);
     for (auto& v : vec)
-        sum = sum + v;
-    return sum;
+        total = total + v;
+    return total;
 }
 
+// optimized dot: fuses multiply-add in float, producing ONE value node only later.
+// the node is initialized with all children.
+// with 2n children and local grads, a lot of shared_ptr allocations are avoided and
+// topology traversal is also made more efficient.
 value_t dot(const vector_t& a, const vector_t& b) {
-    // sanity check
     assert(a.size() == b.size());
+    const size_t n = a.size();
 
-    // perform dot product
-    value_t sum = value_from(0.f);
-    for (int k = 0; k < a.size(); k++) {
-        sum = sum + (a[k] * b[k]);
+    // initializations
+    float result = 0.f;
+    vector_t children;
+    std::vector<float> local_grads;
+    children.reserve(2 * n);
+    local_grads.reserve(2 * n);
+
+    for (size_t k = 0; k < n; k++) {
+        result += a[k]->data * b[k]->data;
+        // grad of output w.r.t. a[k] is b[k]->data, and vice versa
+        children.push_back(a[k]);
+        children.push_back(b[k]);
+        local_grads.push_back(b[k]->data);
+        local_grads.push_back(a[k]->data);
     }
 
-    return sum;
+    return std::make_shared<Value>(result, std::move(children), std::move(local_grads));
+}
+
+// optimized dot for linears:
+// operates on a contiguous slice [offset, offset+len) of x without
+// materializing a new sub-vector
+value_t dot_slice(const vector_t& a_full, int a_offset, const vector_t& b_full, int b_offset, int len) {
+    assert(a_full.size() == b_full.size());
+    const size_t n = a_full.size();
+
+    // initializations
+    float result = 0.f;
+    vector_t children;
+    std::vector<float> local_grads;
+    children.reserve(2 * len);
+    local_grads.reserve(2 * len);
+
+    for (int j = 0; j < len; j++) {
+        const value_t& a = a_full[a_offset + j];
+        const value_t& b = b_full[b_offset + j];
+        result += a->data * b->data;
+        children.push_back(a);
+        children.push_back(b);
+        local_grads.push_back(b->data);
+        local_grads.push_back(a->data);
+    }
+    return std::make_shared<Value>(result, std::move(children), std::move(local_grads));
 }

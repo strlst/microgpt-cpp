@@ -16,8 +16,7 @@ private:
     // local partial derivatives with respect to this node's childrens
     std::vector<float> local_grads;
 
-    // backward pass helper
-    void build_topology(value_t node, vector_t& topology, set_t& visited);
+    void build_topology(value_t node, vector_t& topology, std::unordered_set<Value*>& visited);
 public:
     // store the actual value
     float data;
@@ -75,5 +74,6 @@ void prepare_tensors(std::vector<matrix_t>& keys, std::vector<matrix_t>& values,
 value_t max(const vector_t& vec);
 value_t sum(const vector_t& vec);
 value_t dot(const vector_t& a, const vector_t& b);
+value_t dot_slice(const vector_t& a_full, int a_offset, const vector_t& b_full, int b_offset, int len);
 
 #endif
