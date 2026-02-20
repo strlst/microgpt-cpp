@@ -37,7 +37,7 @@ value_t Value::operator+(const value_t& other) {
 
 value_t Value::operator*(const value_t& other) {
     auto out_children = vector_t{shared_from_this(), other};
-    auto out_grads = std::vector<float>{other->grad, this->grad};
+    auto out_grads = std::vector<float>{other->data, this->data};
     auto out = std::make_shared<Value>(data * other->data, out_children, out_grads);
     return out;
 }
@@ -55,7 +55,7 @@ value_t Value::operator/(const value_t& other) {
 value_t Value::pow(const value_t& other) {
     auto out_children = vector_t{shared_from_this()};
     // high school math: dx**n/dx = n * x**(n - 1)
-    auto out_grads = std::vector<float>{std::pow(this->data, other->data - 1.f)};
+    auto out_grads = std::vector<float>{other->data * std::pow(this->data, other->data - 1.f)};
     auto out = std::make_shared<Value>(std::pow(data, other->data), out_children, out_grads);
     return out;
 }
@@ -97,8 +97,8 @@ void Value::build_topology(vector_t& topology, set_t& visited) {
     visited.emplace(node);
     for (value_t child : node->children) {
         child->build_topology(topology, visited);
-        topology.push_back(node);
     }
+    topology.push_back(node);
 }
 
 void Value::backward() {
@@ -119,7 +119,7 @@ void Value::backward() {
         assert(children.size() == local_grads.size());
         // accumulate gradients
         for (int i = 0; i < children.size(); i++)
-            children[i]->grad += grad * local_grads[i];
+            children[i]->grad += it->get()->grad * local_grads[i];
     }
 }
 

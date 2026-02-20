@@ -8,13 +8,13 @@ Adam::Adam(int num_steps) {
     this->num_steps = num_steps;
 }
 
-void Adam::train(Model model, std::vector<std::string> docs, int BOS) {
+void Adam::train(Model& model, std::vector<std::string> docs, int BOS) {
     // get params as a vector
     vector_t parameters = model.get_all_parameters();
 
     // initialize moment buffers (first and second moment)
-    std::vector<double> mom(parameters.size(), 1.0);
-    std::vector<double> vel(parameters.size(), 1.0);
+    std::vector<double> mom(parameters.size(), 0.0);
+    std::vector<double> vel(parameters.size(), 0.0);
 
     // commence training
     std::cout << "Training with num_steps=" << num_steps << std::endl;
@@ -58,7 +58,7 @@ void Adam::train(Model model, std::vector<std::string> docs, int BOS) {
             vel[i] = beta2 * vel[i] + (1. - beta2) * std::pow(parameters[i]->grad, 2);
             double m_hat = mom[i] / (1. - std::pow(beta1, step + 1));
             double v_hat = vel[i] / (1. - std::pow(beta2, step + 1));
-            double update = lr_t * m_hat / (std::pow(v_hat, .5) - eps_adam);
+            double update = lr_t * m_hat / (std::pow(v_hat, .5) + eps_adam);
             //std::cout << "updating param" << i << " by grad " << update << std::endl;
             parameters[i]->data -= (float)update;
             parameters[i]->grad = 0;

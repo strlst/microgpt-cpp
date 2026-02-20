@@ -152,8 +152,7 @@ m = [0.0] * len(params) # first moment buffer
 v = [0.0] * len(params) # second moment buffer
 
 # Repeat in sequence
-#num_steps = 1000 # number of training steps
-num_steps = 5000
+num_steps = 1000 # number of training steps
 for step in range(num_steps):
 
     # Take single document, tokenize it, surround it with BOS special token on both sides

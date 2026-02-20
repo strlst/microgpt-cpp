@@ -15,7 +15,7 @@ private:
     int num_steps;
 public:
     Adam(int num_steps = 1000);
-    void train(Model model, std::vector<std::string> docs, int BOS);
+    void train(Model& model, std::vector<std::string> docs, int BOS);
 };
 
 #endif
