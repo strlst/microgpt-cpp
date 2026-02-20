@@ -1,6 +1,7 @@
 #include "adam.hpp"
 #include "value.hpp"
 #include <iostream>
+#include <iomanip>
 #include <cmath>
 
 Adam::Adam(int num_steps) {
@@ -8,6 +9,13 @@ Adam::Adam(int num_steps) {
 }
 
 void Adam::train(Model model, std::vector<std::string> docs, int BOS) {
+    // get params as a vector
+    vector_t parameters = model.get_all_parameters();
+
+    // initialize moment buffers (first and second moment)
+    std::vector<double> mom(parameters.size(), 1.0);
+    std::vector<double> vel(parameters.size(), 1.0);
+
     // commence training
     std::cout << "Training with num_steps=" << num_steps << std::endl;
     for (int step = 0; step < num_steps; step++) {
@@ -42,5 +50,20 @@ void Adam::train(Model model, std::vector<std::string> docs, int BOS) {
 
         // finally perform backwards pass
         loss->backward();
+
+        // Adam optimizer update: update the model parameters based on gradients
+        double lr_t = learning_rate * (1. - ((float)step) / ((float)num_steps));
+        for (int i = 0; i < parameters.size(); i++) {
+            mom[i] = beta1 * mom[i] + (1. - beta1) * parameters[i]->grad;
+            vel[i] = beta2 * vel[i] + (1. - beta2) * std::pow(parameters[i]->grad, 2);
+            double m_hat = mom[i] / (1. - std::pow(beta1, step + 1));
+            double v_hat = vel[i] / (1. - std::pow(beta2, step + 1));
+            double update = lr_t * m_hat / (std::pow(v_hat, .5) - eps_adam);
+            //std::cout << "updating param" << i << " by grad " << update << std::endl;
+            parameters[i]->data -= (float)update;
+            parameters[i]->grad = 0;
+        }
+
+        std::cout << "step " << std::setw(4) << step << " / " << num_steps << " | Loss " << loss->data << std::endl;
     }
 }

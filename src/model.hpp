@@ -28,8 +28,13 @@ public:
     // dimension of each head
     int head_dim = n_embed / n_head;
 
+    // constructor
     Model(size_t vocab_size);
 
+    // model inference
+    void infer(int BOS, size_t num_samples, float temperature = .5f);
+
+    // model definition related functions
     matrix_t initialize_matrix(int n_out, int n_in);
     vector_t get_all_parameters();
     vector_t linear(const vector_t& x, const matrix_t& w);

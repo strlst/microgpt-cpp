@@ -25,6 +25,63 @@ Model::Model(size_t vocab_size) {
     std::cout << "Created model(n_embed=" << n_embed << ", n_head=" << n_head << ", n_layer=" << n_layer << ", head_dim=" << head_dim << ")" << std::endl;
 }
 
+void Model::infer(int BOS, size_t num_samples, float temperature) {
+    std::cout << "Inferring " << num_samples << " samples with temperature " << temperature << std::endl;
+
+    for (int step = 0; step < num_samples; step++) {
+        // prepare new KV matrices
+        std::vector<matrix_t> keys;
+        std::vector<matrix_t> values;
+        keys.reserve(n_layer);
+        values.reserve(n_layer);
+        for (int i = 0; i < n_layer; i++) {
+            matrix_t empty, empty2;
+            keys.push_back(empty);
+            values.push_back(empty2);
+        }
+
+        int token_id = BOS;
+        std::vector<int> sample;
+        value_t temp_value = value_from(temperature);
+        for (int pos_id = 0; pos_id < block_size; pos_id++) {
+            // calculate logits like usual
+            vector_t logits = gpt(token_id, pos_id, keys, values);
+
+            // make our logits hotter (or colder, or even just warm)
+            vector_t hot_logits;
+            for (auto& logit : logits)
+                hot_logits.push_back(logit / temp_value);
+
+            // construct probabilities
+            vector_t probabilities = softmax(hot_logits);
+
+            // extract data field from all probabilities
+            std::vector<float> weights;
+            float dist_sum = 0.f;
+            for (auto& p : probabilities) {
+                weights.push_back(p->data);
+                dist_sum += p->data;
+            }
+            // check if distribution sums to 1
+            assert(dist_sum - 1.f < 1e-3);
+
+            //std::cout << probabilities.size() << " weights sum to " << dist_sum << ": ";
+            //print_vector_t(probabilities);
+            std::discrete_distribution<> discrete_dist(weights.begin(), weights.end());
+            token_id = discrete_dist(generator);
+            if (token_id == BOS) {
+                break;
+            }
+            sample.push_back(token_id);
+        }
+
+        std::cout << "sample: ";
+        for (auto& s : sample)
+            std::cout << (char)('a' + (char)s);
+        std::cout << std::endl;
+    }
+}
+
 matrix_t Model::initialize_matrix(int n_out, int n_in) {
     matrix_t matrix;
     matrix.reserve(n_out);
@@ -77,7 +134,7 @@ vector_t Model::softmax(vector_t logits) {
     vector_t exponentials;
     exponentials.reserve(logits.size());
     value_t total = value_from(0.f);
-    for (auto logit : logits) {
+    for (auto& logit : logits) {
         value_t exponential = (logit - max_value)->exp();
         exponentials.push_back(exponential);
         total = total + exponential;
@@ -86,7 +143,7 @@ vector_t Model::softmax(vector_t logits) {
     // finally execute normalization step
     vector_t div;
     div.reserve(logits.size());
-    for (auto exponential : exponentials)
+    for (auto& exponential : exponentials)
         div.push_back(exponential / total);
 
     return div;
@@ -106,9 +163,9 @@ vector_t Model::rms_norm(vector_t x) {
 
 vector_t Model::gpt(int token_id, int pos_id, std::vector<matrix_t>& keys, std::vector<matrix_t>& values) {
     // load token embedding
-    vector_t token_emb = weights["wte"][token_id];
+    vector_t& token_emb = weights["wte"][token_id];
     // load position embedding
-    vector_t pos_emb = weights["wpe"][pos_id];
+    vector_t& pos_emb = weights["wpe"][pos_id];
     assert(token_emb.size() == pos_emb.size());
 
     // compute emb
@@ -124,7 +181,7 @@ vector_t Model::gpt(int token_id, int pos_id, std::vector<matrix_t>& keys, std::
     for (int li = 0; li < n_layer; li++) {
         //std::cout << "At layer " << li << std::endl;
         std::string prefix = "layer" + std::to_string(li) + "_";
-        vector_t x_residual = x;
+        vector_t x_residual = copy(x);
         x = rms_norm(x);
         vector_t q = linear(x, weights[prefix + "attn_wq"]);
         vector_t k = linear(x, weights[prefix + "attn_wk"]);
@@ -142,13 +199,13 @@ vector_t Model::gpt(int token_id, int pos_id, std::vector<matrix_t>& keys, std::
             // prepare keys
             matrix_t k_h;
             k_h.reserve(keys[li].size());
-            for (auto ki : keys[li])
+            for (auto& ki : keys[li])
                 k_h.emplace_back(ki.begin() + hs, ki.begin() + hs + head_dim);
 
             // prepare values
             matrix_t v_h;
             v_h.reserve(values[li].size());
-            for (auto vi : values[li])
+            for (auto& vi : values[li])
                 v_h.emplace_back(vi.begin() + hs, vi.begin() + hs + head_dim);
 
             vector_t attn_logits;
@@ -176,7 +233,7 @@ vector_t Model::gpt(int token_id, int pos_id, std::vector<matrix_t>& keys, std::
         for (int i = 0; i < x.size(); i++)
             x_res_sum.push_back(x[i] + x_residual[i]);
 
-        x_residual = x;
+        x_residual = copy(x);
 
         x = rms_norm(x);
 

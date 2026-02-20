@@ -16,6 +16,17 @@ Value::Value(float data, vector_t children, std::vector<float> local_grads) {
     this->local_grads = local_grads;
 }
 
+Value::Value(float data, float grad, vector_t children, std::vector<float> local_grads) {
+    this->data = data;
+    this->grad = grad;
+    this->children = children;
+    this->local_grads = local_grads;
+}
+
+value_t Value::copy() {
+    return std::make_shared<Value>(data, grad, children, local_grads);
+}
+
 // binary ops
 value_t Value::operator+(const value_t& other) {
     auto out_children = vector_t{shared_from_this(), other};
@@ -78,9 +89,38 @@ value_t Value::relu() {
     return out;
 }
 
+void Value::build_topology(vector_t& topology, set_t& visited) {
+    value_t node = shared_from_this();
+    // skip visited nodes
+    if (visited.find(node) != visited.end())
+        return;
+    visited.emplace(node);
+    for (value_t child : node->children) {
+        child->build_topology(topology, visited);
+        topology.push_back(node);
+    }
+}
+
 void Value::backward() {
-    std::cerr << "Error: Backward pass unimplemented yet" << std::endl;
-    // TODO
+    vector_t topology;
+    set_t visited;
+
+    // build topology first
+    this->build_topology(topology, visited);
+
+    // reset root grad
+    this->grad = 1.f;
+
+    // iterate topology backwards for root-first grad
+    for (auto it = topology.rbegin(); it != topology.rend(); it++) {
+        auto& children = it->get()->children;
+        auto& local_grads = it->get()->local_grads;
+        // sanity check
+        assert(children.size() == local_grads.size());
+        // accumulate gradients
+        for (int i = 0; i < children.size(); i++)
+            children[i]->grad += grad * local_grads[i];
+    }
 }
 
 std::string Value::to_string() const {
@@ -118,25 +158,39 @@ value_t value_from(float x) {
     return std::make_shared<Value>(x);
 }
 
-void print_vector_t(const vector_t vector) {
+void print_vector_ptrs(const vector_t& vector) {
+    std::cout << "vector_ptrs[";
+    for (auto& val : vector)
+        std::cout << &val << ' ';
+    std::cout << "]" << std::endl;
+}
+
+void print_vector(const vector_t& vector) {
     std::cout << "vector[";
-    for (auto val : vector)
+    for (auto& val : vector)
         std::cout << val << ' ';
     std::cout << "]" << std::endl;
 }
 
-void print_matrix_t(const matrix_t matrix) {
+void print_matrix(const matrix_t& matrix) {
     std::cout << "matrix[";
-    for (auto row : matrix) {
-        print_vector_t(row);
+    for (auto& row : matrix) {
+        print_vector(row);
     }
     std::cout << "]" << std::endl;
+}
+
+vector_t copy(vector_t& vec) {
+    vector_t new_vec;
+    for (auto& v : vec)
+        new_vec.push_back(v->copy());
+    return new_vec;
 }
 
 value_t max(vector_t vec) {
     // compute max float
     float max_float = 0.f;
-    for (auto v : vec)
+    for (auto& v : vec)
         max_float = std::max(max_float, v->data);
     // create shared value
     return value_from(max_float);
@@ -145,7 +199,7 @@ value_t max(vector_t vec) {
 value_t sum(vector_t vec) {
     // perform sum
     value_t sum = value_from(0.f);
-    for (auto v : vec)
+    for (auto& v : vec)
         sum = sum + v;
     return sum;
 }

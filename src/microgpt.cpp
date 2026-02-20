@@ -26,8 +26,11 @@ int main() {
 
     // initialize model, especially the params, so there be stored values
     Model model(vocab_size);
-    Adam adam(1);
+    Adam adam(100);
     adam.train(model, docs, BOS);
+
+    // perform inference
+    model.infer(BOS, 30);
 
     return 0;
 }

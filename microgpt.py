@@ -153,7 +153,7 @@ v = [0.0] * len(params) # second moment buffer
 
 # Repeat in sequence
 #num_steps = 1000 # number of training steps
-num_steps = 1
+num_steps = 5000
 for step in range(num_steps):
 
     # Take single document, tokenize it, surround it with BOS special token on both sides
@@ -182,7 +182,9 @@ for step in range(num_steps):
         v[i] = beta2 * v[i] + (1 - beta2) * p.grad ** 2
         m_hat = m[i] / (1 - beta1 ** (step + 1))
         v_hat = v[i] / (1 - beta2 ** (step + 1))
-        p.data -= lr_t * m_hat / (v_hat ** 0.5 + eps_adam)
+        update = lr_t * m_hat / (v_hat ** 0.5 + eps_adam)
+        #print(f"updating param {i} by grad {update}")
+        p.data -= update
         p.grad = 0
 
     print(f"step {step+1:4d} / {num_steps:4d} | loss {loss.data:.4f}")
@@ -190,8 +192,7 @@ for step in range(num_steps):
 # Inference: may the model babble back to us
 temperature = 0.5 # in (0, 1], control the "creativity" of generated text, low to high
 print("\n--- inference (new, hallucinated names) ---")
-#samples = 20
-samples = 1
+samples = 20
 for sample_idx in range(samples):
     keys, values = [[] for _ in range(n_layer)], [[] for _ in range(n_layer)]
     token_id = BOS
