@@ -61,8 +61,8 @@ Below is a simple performance comparison (AMD Ryzen 7 5700X).
 
 command                | 200 training steps | 1k training steps
 :----------------------|-------------------:|-----------------:
-`python3 micrograd.py` |           0m3.421s |         1m13.109s
-`make; micrograd`      |          0m15.446s |         0m17.132s
+`python3 micrograd.py` |          0m15.446s |         1m13.109s
+`make; micrograd`      |           0m3.421s |         0m17.132s
 
 ## Flamegraph Execution Time Breakdown
 
@@ -70,3 +70,11 @@ Flamegraphs generated as in `flamegraph.sh` can be used effectively to investiga
 Below is an example.
 
 ![Flamegraph performance breakdown](flamegraph.png)
+
+## Limitations
+
+Smart pointers incur significant performance costs (e.g. ref-counts) and should be avoided.
+In this case, it would be possible and sensible to employ some type of manual allocator, such as an arena allocator and deal with direct, memory-safe pointers.
+
+However, architecturally performance can also be brought down by avoiding redundant allocations, as could be achieved by using a KV cache.
+Parts of the program are also embarrassingly parallel and thus candidates for acceleration using convenient libraries such as OpenMP.
